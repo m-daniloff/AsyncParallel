@@ -116,7 +116,14 @@ namespace StockHistory
 				// an implicit .Wait), we use WaitAll for efficiency so that we process tasks in
 				// order as they finish (versus an arbitrary order implied by calls to .Result).
 				//
-				Task.WaitAll(new Task[] { T_min, T_max, T_avg, T_stddev, T_stderr });
+				try
+				{
+					Task.WaitAll(new Task[] { T_min, T_max, T_avg, T_stddev, T_stderr });
+				}
+				catch (AggregateException)  // tasking errors:
+				{
+					throw;  // re-throw, output error messages below:
+				}
 
 				decimal min = T_min.Result;
 				decimal max = T_max.Result;
@@ -135,6 +142,15 @@ namespace StockHistory
 				Console.WriteLine("   Max price:    {0:C}", max);
 				Console.WriteLine("   Avg price:    {0:C}", avg);
 				Console.WriteLine("   Std dev/err:   {0:0.000} / {1:0.000}", stddev, stderr);
+			}
+			catch (AggregateException ae)
+			{
+				Console.WriteLine();
+				Console.WriteLine("** {0} **", symbol);
+
+				ae = ae.Flatten();  // could have a tree of exceptions, so flatten first:
+				foreach (Exception ex in ae.InnerExceptions)
+					Console.WriteLine("Tasking error: {0}", ex.Message);
 			}
 			catch (Exception ex)
 			{

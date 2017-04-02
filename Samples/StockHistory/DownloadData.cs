@@ -145,35 +145,51 @@ namespace StockHistory
 			//
 			Task<StockData> t_yahoo = Task.Factory.StartNew(() =>
 				{
-					StockData yahoo =  GetDataFromYahoo(symbol, numYearsOfHistory);
-					return yahoo;
+					return GetDataFromYahoo(symbol, numYearsOfHistory);
 				}
 			);
 
 			Task<StockData> t_nasdaq = Task.Factory.StartNew(() =>
 				{
-					StockData nasdaq = GetDataFromNasdaq(symbol, numYearsOfHistory);
-					return nasdaq;
+					return GetDataFromNasdaq(symbol, numYearsOfHistory);
 				}
 			);
 
 			Task<StockData> t_msn = Task.Factory.StartNew(() =>
 				{
-					StockData msn = GetDataFromMsn(symbol, numYearsOfHistory);
-					return msn;
+					return GetDataFromMsn(symbol, numYearsOfHistory);
 				}
 			);
 
 			//
-			// Now wait for the first one to return data:
+			// Now wait for the first one to successfully return data (the others we leave
+			// running since difficult to cancel due to cooperative model):
 			//
-			Task<StockData>[] tasks = { t_yahoo, t_nasdaq, t_msn };
-			int index = Task.WaitAny(tasks);
+			List<Task<StockData>> tasks = new List<Task<StockData>>();
 
-			return tasks[index].Result;
+			tasks.Add(t_yahoo);
+			tasks.Add(t_nasdaq);
+			tasks.Add(t_msn);
 
-			// all failed:
-			//throw new ApplicationException("all web sites failed");
+			// 
+			// WaitOneByOne pattern: first one that returns without exception
+			//
+			while (tasks.Count > 0)
+			{
+				int winner = Task.WaitAny(tasks.ToArray());  // no task-based exception thrown here:
+
+				// was task successful?  Check exception here:
+				if (tasks[winner].Exception == null)  // success!
+					return tasks[winner].Result;
+
+				// else this task failed, wait for next to finish:
+				tasks.RemoveAt(winner);
+			}
+
+			//
+			// if get here, all tasks failed:
+			//
+			throw new ApplicationException("all web sites failed");
 		}
 
 
